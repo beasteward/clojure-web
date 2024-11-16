@@ -1,0 +1,226 @@
+-- START:save-message
+-- :name save-message! :<! :1
+-- :doc creates a new message using the name and message keys
+INSERT INTO posts
+(author, name, message, parent)
+VALUES (:author, :name, :message, :parent)
+RETURNING *;
+-- END:save-message
+
+-- START:posts
+-- :name get-messages :? :*
+-- :doc selects all available messages
+SELECT * from posts_with_meta
+
+-- :name get-message :? :1
+-- :doc selects a message
+SELECT * from posts_with_meta
+              inner join (select id, parent from posts) as p using (id)
+              inner join reply_count using (id)
+where id = :id
+
+-- :name get-messages-by-author :? :*
+-- :doc selects all messages posted by a user
+SELECT * from posts_with_meta
+WHERE author = :author
+-- END:posts
+
+-- START:users
+-- :name create-user!* :! :n
+-- :doc creates a new user with the provided login and hashed password
+INSERT INTO users
+(login, password)
+VALUES (:login, :password)
+
+-- START:password
+-- :name set-password-for-user!* :! :n
+UPDATE users
+SET password = :password
+where login = :login
+-- END:password
+
+-- START:delete
+-- :name delete-user!* :! :n
+DELETE FROM users
+where login = :login
+-- END:delete
+
+-- :name get-user-for-auth* :? :1
+-- :doc selects a user for authentication
+SELECT * FROM users
+WHERE login = :login
+-- END:users
+
+-- START:profile
+-- :name set-profile-for-user*  :<! :1
+-- :doc sets a profile map for the specified user
+UPDATE users
+SET profile = :profile
+where :login = login
+RETURNING *;
+
+-- :name get-user* :? :1
+-- :doc gets a user's publicly available information
+SELECT login, created_at, profile from users
+WHERE login = :login
+-- END:profile
+
+-- START:media
+-- :name save-file! :! :n
+-- saves a file to the database
+INSERT INTO media
+(name, type, owner, data)
+VALUES (:name, :type, :owner, :data)
+ON CONFLICT (name) DO UPDATE
+SET type = :type,
+    data = :data
+WHERE media.owner = :owner
+
+-- :name get-file :? :1
+-- Gets a file from the database
+select * from media
+where name = :name
+-- END:media
+
+
+-- START:boosts
+-- :name boost-post! :! :n
+-- Boosts a post, or moves a boost to the top of the user's timeline
+INSERT INTO boosts
+(user_id, post_id, poster)
+VALUES (:user, :post, nullif(:poster, :user))
+ON CONFLICT (user_id, post_id) DO UPDATE
+SET timestamp = now()
+WHERE boosts.user_id = :user
+AND   boosts.post_id = :post
+
+-- :name boosters-of-post :? :*
+-- Get all boosters of a post
+SELECT user_id as user from boosts
+where post_id = :post
+
+--END:boosts
+
+--START:timeline
+-- :name get-timeline :? :*
+-- Gets the latest post or boost for each post
+select * from
+(select distinct on (p.id) * from posts_and_boosts as p
+ order by p.id, p.posted_at desc) as t
+order by t.posted_at asc
+
+
+-- :name get-timeline-for-poster :? :*
+-- Gets the latest post or boost for each post
+select * from
+(select distinct on (p.id) * from posts_and_boosts as p
+ where p.poster = :poster
+ order by p.id, p.posted_at desc) as t
+order by t.posted_at asc
+
+-- :name get-timeline-post :? :1
+-- Gets the boosted post for updating timelines
+select * from posts_and_boosts
+where is_boost = :is_boost
+and poster = :user
+and id = :post
+order by posted_at asc
+limit 1
+
+--END:timeline
+
+--START:tag-feed
+-- :name get-feed-for-tag :? :*
+-- :require [guestbook.db.util :refer [tag-regex]]
+-- Given a tag, return its feed
+select * from
+(select distinct on (p.id) * from posts_and_boosts as p
+  where
+  /*~ (if (:tag params) */
+    p.message ~*
+    /*~*/
+    false
+    /*~ ) ~*/
+    --~ (when (:tag params) (tag-regex (:tag params)))
+  order by p.id, posted_at desc) as t
+ order by t.posted_at asc
+--END:tag-feed
+
+--START:feed
+-- :name get-feed :? :*
+-- :require [guestbook.db.util :refer [tags-regex]]
+-- Given a vector of follows and a vector of tags, return a feed
+select * from
+(select distinct on (p.id) * from posts_and_boosts as p
+  where
+  /*~ (if (seq (:follows params)) */
+    p.poster in (:v*:follows)
+    /*~*/
+    false
+    /*~ ) ~*/
+    or
+    /*~ (if (seq (:tags params)) */
+    p.message ~*
+    /*~*/
+    false
+    /*~ ) ~*/
+    --~ (when (seq (:tags params)) (tags-regex (:tags params)))
+  order by p.id, posted_at desc) as t
+order by t.posted_at asc
+--END:feed
+
+--START:boost-chain
+-- :name get-reboosts :? :*
+-- Gets all boosts descended from a given boost
+WITH RECURSIVE reboosts AS
+(WITH post_boosts AS
+ (SELECT user_id, poster
+  FROM boosts
+  WHERE post_id = :post)
+ SELECT user_id, poster
+ FROM post_boosts
+ where user_id = :user
+ UNION
+ SELECT b.user_id, b.poster
+ FROM post_boosts b INNER JOIN reboosts r ON r.user_id = b.poster)
+select user_id as user, poster as source from reboosts
+
+-- :name get-boost-chain :? :*
+-- Gets all boosts above the original boost
+WITH RECURSIVE reboosts AS
+(WITH post_boosts AS
+ (SELECT user_id, poster
+  FROM boosts
+  WHERE post_id = :post)
+ SELECT user_id, poster
+ FROM post_boosts
+ where user_id = :user
+ UNION
+ SELECT b.user_id, b.poster
+ FROM post_boosts b INNER JOIN reboosts r ON r.poster = b.user_id)
+select user_id as user, poster as source from reboosts
+--END:boost-chain
+
+--START:replies
+-- :name get-replies :? :*
+select * from posts_with_meta
+              inner join (select id, parent from posts) as p using (id)
+              inner join reply_count using (id)
+   where id IN (select id from posts
+                 where parent = :id)
+--END:replies
+
+--START:parents
+-- :name get-parents
+SELECT * from posts_with_meta
+              inner join (select id, parent from posts) as p using (id)
+              inner join reply_count using (id)
+ where id in (with recursive parents as
+              (select id, parent from posts
+                where id = :id
+               UNION
+               select p.id, p.parent from posts p
+                               inner join parents pp
+                                       on p.id = pp.parent)
+              select id from parents)
+--END:get-parents
