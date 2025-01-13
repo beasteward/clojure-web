@@ -20,3 +20,4 @@
 ;; In one terminal run:  npx shadow-cljs watch app
 ;; In a second terminal run:  lein run
 ;; View State in Browser
+;; Re-Frame-10x browser extension show/hide 'Ctrl + H'

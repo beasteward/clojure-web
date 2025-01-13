@@ -64,6 +64,30 @@
          (rf/dispatch [:router/navigated new-match-with-controllers]))))
    {:use-fragment false}))
 ;
+
+;
+(defn menu []
+  (fn []
+    [:div {:class "bg-slate-100 p-0"}
+     [:aside
+      [:ul {:class "flex flex-col items-center"}
+       [:li {:class "text-center w-full hover:bg-white"}
+        [:a {:class "flex flex-col items-center px-5 py-4 hover:text-indigo-700"}
+         [:span.material-icons "chat_bubble_outline"]
+         [:span "Chat"]]]
+       [:li {:class "text-center w-full hover:bg-white"}
+        [:a {:href (rtfe/href :guestbook.routes.app/feed) :class "flex flex-col items-center px-5 py-4 hover:text-indigo-700"}
+         [:span.material-icons "dynamic_feed"]
+         [:span "Feed"]]]
+       [:li {:class "text-center w-full hover:bg-white"}
+        [:a {:class "flex flex-col items-center px-5 py-4 hover:text-indigo-700"}
+         [:span.material-icons "groups"]
+         [:span "Groups"]]]
+       [:li {:class "text-center w-full hover:bg-white"}
+        [:a {:class "flex flex-col items-center px-5 py-4 hover:text-indigo-700"}
+         [:span.material-icons "perm_contact_calendar"]
+         [:span "Calendar"]]]]]]));
+
 ;
 (defn navbar []
   ;; Same as before, but with references to moved code (e.g. `auth/nameplate`)
@@ -132,7 +156,8 @@
 (defn page [{{:keys [view name]} :data
              path                :path
              :as                 match}]
-  [:section.section>div.container
+  [:section>div.is-flex
+   [menu]
    (if view
      [view match]
      [:div "No view specified for route: " name " (" path ")"])])

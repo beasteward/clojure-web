@@ -9,7 +9,11 @@ body {
   font-weight: 400;
   font-display: block;
   src: url(/assets/material-icons/iconfont/material-icons.woff) format('woff'),
-    url(/assets/material-icons/iconfont/material-icons.woff2) format('woff2');
+    url(/assets/material-icons/iconfont/material-icons.woff2) format('woff2'),
+    url(/assets/material-icons/iconfont/material-icons-outlined.woff)
+      format('woff'),
+    url(/assets/material-icons/iconfont/material-icons-outlined.woff2)
+      format('woff2');
 }
 .material-icons {
   font-family: 'Material Icons';

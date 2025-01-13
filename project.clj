@@ -37,6 +37,7 @@
                  [org.clojure/google-closure-library "0.0-20191016-6ae1f72f" :scope "provided"]
                  [thheller/shadow-cljs "2.20.3" :scope "provided"]
                  ;
+                 [org.clojure/core.async "1.6.681"]
                  [org.clojure/clojure "1.11.1"]
                  [org.clojure/tools.cli "1.0.214"]
                  [org.clojure/tools.logging "1.2.4"]
